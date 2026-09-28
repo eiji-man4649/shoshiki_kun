@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書類フォーマットプレビューツール（原稿用紙風）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --cols: 20;
+            --rows: 20;
+            --cell-size: 32px;
+        }
+
+        body {
+            font-family: 'Inter', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+            background-color: #f8fafc;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* プレビューエリアの背景と中央揃え */
+        .masume-container {
+            background-color: #e2e8f0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 3rem;
+        }
+
+        /* 原稿用紙風の枠組み */
+        .masume-grid-wrapper {
+            background-color: #ffffff;
+            padding: 2.5rem 3rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* グリッド本体（右端と上端のボーダー） */
+        .masume-grid {
+            display: grid;
+            grid-template-columns: repeat(var(--cols), var(--cell-size));
+            border-top: 1.5px solid #22c55e; /* Tailwind Green-500 */
+            border-right: 1.5px solid #22c55e;
+            width: max-content;
+        }
+
+        /* 個別の升目（左端と下端のボーダー） */
+        .masume-cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'MS Mincho', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+            font-size: 18px;
+            color: #1e293b;
+            border-bottom: 1.5px solid #22c55e;
+            border-left: 1.5px solid #22c55e;
+            line-height: 1;
+            box-sizing: border-box;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body>
+
+    <header class="bg-white shadow-sm z-10 border-b border-gray-200">
+        <div class="max-w-screen-2xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                書類フォーマットプレビューツール
+            </h1>
+            
+            <div class="flex items-center gap-6 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200 shadow-inner">
+                <div class="flex items-center gap-2">
+                    <label for="cols-input" class="text-sm font-semibold text-slate-600">1行の文字数:</label>
+                    <input type="number" id="cols-input" value="20" min="10" max="100" class="w-16 px-2 py-1 border border-slate-300 rounded text-center focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-colors">
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="rows-input" class="text-sm font-semibold text-slate-600">行数:</label>
+                    <input type="number" id="rows-input" value="20" min="1" max="200" class="w-16 px-2 py-1 border border-slate-300 rounded text-center focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-colors">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- Left Pane: Input Area -->
+        <div class="flex-1 flex flex-col bg-white border-r border-slate-200 shadow-inner z-0 w-full md:w-1/2 h-1/2 md:h-full relative">
+            <div class="absolute top-0 left-0 w-full bg-slate-100/90 backdrop-blur-sm border-b border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider flex justify-between items-center">
+                <span>入力枠 (Input)</span>
+            </div>
+            <textarea id="raw-input" class="flex-grow w-full h-full pt-12 p-6 resize-none focus:outline-none text-slate-800 text-base leading-relaxed bg-transparent" placeholder="ここにテキストを入力してください...&#10;（改行はそのまま反映されます）"></textarea>
+        </div>
+
+        <!-- Right Pane: Preview Area -->
+        <div class="flex-1 flex flex-col relative w-full md:w-1/2 h-1/2 md:h-full bg-slate-200">
+            <div class="absolute top-0 left-0 w-full bg-slate-100/90 backdrop-blur-sm border-b border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider z-10 flex justify-between items-center shadow-sm">
+                <span>プレビュー枠 (Preview)</span>
+                <span id="overflow-warning" class="text-red-600 hidden font-bold flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    行数上限オーバー
+                </span>
+            </div>
+            
+            <div class="masume-container pt-16" id="masume-container">
+                <div class="masume-grid-wrapper">
+                    <div id="masume-preview" class="masume-grid">
+                        <!-- Grid cells will be generated here by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </main>
+
+    <footer class="bg-slate-900 text-white shadow-lg z-20 flex-shrink-0">
+        <div class="max-w-screen-2xl mx-auto px-4 py-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center divide-x-0 md:divide-x divide-slate-700">
+                <div class="flex flex-col px-2">
+                    <span class="text-xs text-slate-400 mb-1">文字数（スペース込）</span>
+                    <span class="text-2xl font-bold font-mono" id="stat-chars-with-spaces">0</span>
+                </div>
+                <div class="flex flex-col px-2">
+                    <span class="text-xs text-slate-400 mb-1">文字数（スペース抜）</span>
+                    <span class="text-2xl font-bold font-mono" id="stat-chars-no-spaces">0</span>
+                </div>
+                <div class="flex flex-col px-2">
+                    <span class="text-xs text-slate-400 mb-1">消費マス数（空白マス込）</span>
+                    <span class="text-2xl font-bold font-mono text-green-400" id="stat-squares">0</span>
+                </div>
+                <div class="flex flex-col px-2">
+                    <span class="text-xs text-slate-400 mb-1">使用行数 / 最大行数</span>
+                    <div class="text-2xl font-bold font-mono">
+                        <span id="stat-lines-used" class="transition-colors">0</span>
+                        <span class="text-slate-500 text-lg mx-1">/</span>
+                        <span id="stat-lines-max" class="text-slate-500 text-lg">20</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const colsInput = document.getElementById('cols-input');
+            const rowsInput = document.getElementById('rows-input');
+            const rawInput = document.getElementById('raw-input');
+            const masumePreview = document.getElementById('masume-preview');
+            
+            const statCharsWithSpaces = document.getElementById('stat-chars-with-spaces');
+            const statCharsNoSpaces = document.getElementById('stat-chars-no-spaces');
+            const statSquares = document.getElementById('stat-squares');
+            const statLinesUsed = document.getElementById('stat-lines-used');
+            const statLinesMax = document.getElementById('stat-lines-max');
+            const overflowWarning = document.getElementById('overflow-warning');
+
+            // Global State
+            let currentCols = parseInt(colsInput.value, 10);
+            let currentRows = parseInt(rowsInput.value, 10);
+            let cells = [];
+
+            /**
+             * グリッドをDOMに生成する
+             */
+            function initGrid() {
+                currentCols = parseInt(colsInput.value, 10) || 20;
+                currentRows = parseInt(rowsInput.value, 10) || 20;
+                
+                // CSS変数に列数を適用（これにより自動で升目が並ぶ）
+                document.documentElement.style.setProperty('--cols', currentCols);
+                statLinesMax.textContent = currentRows;
+                
+                // 既存のグリッドをクリア
+                masumePreview.innerHTML = '';
+                cells = [];
+                
+                // 升目を指定数（列 × 行）作成
+                const totalCells = currentCols * currentRows;
+                for (let i = 0; i < totalCells; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'masume-cell';
+                    masumePreview.appendChild(cell);
+                    cells.push(cell); // 高速アクセスのため配列に保持
+                }
+                
+                updatePreviewAndStats();
+            }
+
+            /**
+             * 入力テキストをグリッドに割り当てて統計を計算する
+             */
+            function updatePreviewAndStats() {
+                const text = rawInput.value;
+                // 改行コードを \n に統一
+                const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                
+                // すべての升目の文字をクリア
+                for(let i = 0; i < cells.length; i++) {
+                    cells[i].textContent = '';
+                }
+                
+                let r = 0; // 現在の行 (0から開始)
+                let c = 0; // 現在の列 (0から開始)
+                let withSpaces = 0;
+                let noSpaces = 0;
+                let isOverflowing = false;
+
+                // 1文字ずつ判定してマスに配置していく
+                for (let i = 0; i < normalizedText.length; i++) {
+                    const char = normalizedText[i];
+                    
+                    // 【修正点】改行の処理
+                    // 改行文字が来た場合は、現在の文字数がいくつであっても強制的に次の行へ移動
+                    if (char === '\n') {
+                        r++;
+                        c = 0;
+                        continue; // 次の文字の処理へ
+                    }
+                    
+                    // 【修正点】自動折り返しの処理
+                    // もし現在の列(c)が最大列数(currentCols)に達していたら、次の行へ移動してから文字を置く
+                    if (c >= currentCols) {
+                        r++;
+                        c = 0;
+                    }
+
+                    // 文字数のカウント
+                    withSpaces++;
+                    // 全角・半角スペース、タブを除外した文字数
+                    if (char !== ' ' && char !== '　' && char !== '\t') {
+                        noSpaces++;
+                    }
+                    
+                    // 升目へのテキスト挿入
+                    const index = r * currentCols + c;
+                    if (index < cells.length) {
+                        cells[index].textContent = char;
+                    } else {
+                        isOverflowing = true;
+                    }
+                    
+                    // 列を1つ進める
+                    c++;
+                }
+
+                // --- 統計の計算 ---
+                // 消費したマス数（現在の行 * 1行のマス数 + 現在の列）
+                // 改行によって生じた「行末の空白マス」も全て消費マスとしてカウントされる
+                let squares = (r * currentCols) + c;
+                // 現在使用している行数
+                let lines = (squares > 0 || r > 0) ? (r + 1) : 0; 
+                
+                if (normalizedText.length === 0) {
+                    squares = 0;
+                    lines = 0;
+                }
+
+                // UIの数値を更新
+                statCharsWithSpaces.textContent = withSpaces.toLocaleString();
+                statCharsNoSpaces.textContent = noSpaces.toLocaleString();
+                statSquares.textContent = squares.toLocaleString();
+                statLinesUsed.textContent = lines.toLocaleString();
+
+                // 上限オーバー時の警告表示と色変更
+                if (lines > currentRows || isOverflowing) {
+                    statLinesUsed.classList.add('text-red-400');
+                    statLinesUsed.classList.remove('text-white');
+                    overflowWarning.classList.remove('hidden');
+                } else {
+                    statLinesUsed.classList.remove('text-red-400');
+                    statLinesUsed.classList.add('text-white');
+                    overflowWarning.classList.add('hidden');
+                }
+            }
+
+            // イベントリスナーの登録
+            rawInput.addEventListener('input', updatePreviewAndStats);
+            colsInput.addEventListener('input', initGrid);
+            rowsInput.addEventListener('input', initGrid);
+
+            // 初期化実行
+            initGrid();
+        });
+    </script>
+</body>
+</html>
