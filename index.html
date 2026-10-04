@@ -3,18 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>書類フォーマットプレビューツール（原稿用紙風）</title>
+    <title>原稿用紙・公的書類マス目プレビュー＆自動書式整形ツール</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        genko: {
+                            green: '#15803d',
+                            greenBg: '#f0fdf4',
+                            vermilion: '#c2410c',
+                            vermilionBg: '#fff7ed',
+                            gray: '#475569',
+                            grayBg: '#f8fafc',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
         :root {
             --cols: 20;
             --rows: 20;
             --cell-size: 32px;
+            --grid-color: #16a34a;
+            --grid-bg: #ffffff;
+            --grid-border: #15803d;
+            --badge-hanging: #ef4444;
+            --badge-2char: #2563eb;
+            --badge-merged: #9333ea;
+        }
+
+        /* Manuscript Paper Themes */
+        .theme-green {
+            --grid-color: #16a34a;
+            --grid-bg: #ffffff;
+            --grid-border: #15803d;
+        }
+        .theme-vermilion {
+            --grid-color: #ea580c;
+            --grid-bg: #ffffff;
+            --grid-border: #c2410c;
+        }
+        .theme-gray {
+            --grid-color: #64748b;
+            --grid-bg: #ffffff;
+            --grid-border: #334155;
         }
 
         body {
-            font-family: 'Inter', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
-            background-color: #f8fafc;
+            font-family: 'Inter', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+            background-color: #f1f5f9;
             margin: 0;
             height: 100vh;
             display: flex;
@@ -22,288 +68,865 @@
             overflow: hidden;
         }
 
-        /* プレビューエリアの背景と中央揃え */
+        /* Manuscript Paper Canvas Container */
         .masume-container {
-            background-color: #e2e8f0;
+            background-color: #cbd5e1;
             width: 100%;
             height: 100%;
             overflow: auto;
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            padding: 3rem;
+            padding: 2.5rem;
         }
 
-        /* 原稿用紙風の枠組み */
-        .masume-grid-wrapper {
-            background-color: #ffffff;
-            padding: 2.5rem 3rem;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        /* Manuscript Sheet (Genkoyoshi) Wrapper */
+        .masume-sheet {
+            background-color: var(--grid-bg);
+            padding: 2.5rem 3rem 3rem 3rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+            position: relative;
+            transition: all 0.2s ease-in-out;
+            transform-origin: top center;
         }
 
-        /* グリッド本体（右端と上端のボーダー） */
+        /* Outer Border Frame */
+        .masume-outer-frame {
+            border: 2.5px solid var(--grid-border);
+            padding: 4px;
+            position: relative;
+        }
+
+        /* Column Number Bar (Top) */
+        .col-number-bar {
+            display: grid;
+            grid-template-columns: repeat(var(--cols), var(--cell-size));
+            margin-bottom: 4px;
+        }
+        .col-num {
+            font-size: 10px;
+            color: var(--grid-color);
+            text-align: center;
+            font-family: monospace;
+            opacity: 0.7;
+        }
+
+        /* Grid Body */
         .masume-grid {
             display: grid;
             grid-template-columns: repeat(var(--cols), var(--cell-size));
-            border-top: 1.5px solid #22c55e; /* Tailwind Green-500 */
-            border-right: 1.5px solid #22c55e;
+            border-top: 1.5px solid var(--grid-color);
+            border-right: 1.5px solid var(--grid-color);
             width: max-content;
+            background-color: #ffffff;
+            position: relative;
         }
 
-        /* 個別の升目（左端と下端のボーダー） */
+        /* Individual Cell */
         .masume-cell {
             width: var(--cell-size);
             height: var(--cell-size);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'MS Mincho', 'Yu Mincho', 'Hiragino Mincho ProN', serif;
+            /* フォントはコンテナから継承 */
             font-size: 18px;
-            color: #1e293b;
-            border-bottom: 1.5px solid #22c55e;
-            border-left: 1.5px solid #22c55e;
-            line-height: 1;
+            color: #0f172a;
+            border-bottom: 1.5px solid var(--grid-color);
+            border-left: 1.5px solid var(--grid-color);
             box-sizing: border-box;
+            position: relative;
+            user-select: none;
+        }
+
+        /* Rule Indicators inside cells */
+        .cell-merged {
+            font-size: 13px;
+            letter-spacing: -2px;
+            color: #7e22ce;
+            background-color: #faf5ff;
+            font-weight: bold;
+        }
+
+        .cell-indent {
+            background-color: #fefce8;
+        }
+
+        .cell-indent::after {
+            content: '␣';
+            font-size: 12px;
+            color: #ca8a04;
+            opacity: 0.4;
+            position: absolute;
+        }
+
+        /* Font Classes for Grid */
+        .font-mincho { font-family: 'Noto Serif JP', 'MS Mincho', 'Yu Mincho', 'Hiragino Mincho ProN', serif; }
+        .font-gothic { font-family: 'Noto Sans JP', 'MS Gothic', 'Yu Gothic', 'Hiragino Kaku Gothic ProN', sans-serif; }
+        .font-klee { font-family: 'Klee One', 'MS Mincho', serif; }
+
+        /* Hanging Punctuation Badge attached to right edge */
+        .hanging-badge {
+            position: absolute;
+            right: -10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: #ef4444;
+            color: white;
+            font-size: 11px;
+            padding: 0px 3px;
+            border-radius: 3px;
+            font-family: 'MS Mincho', serif;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            white-space: nowrap;
+            animation: pulse-short 0.5s ease-in-out;
+        }
+
+        /* Row Number Margin (Left) */
+        .row-number-margin {
+            position: absolute;
+            left: -24px;
+            top: 4px;
+            display: flex;
+            flex-direction: column;
+            height: calc(100% - 8px);
+            justify-content: space-around;
+        }
+        .row-num {
+            font-size: 10px;
+            color: var(--grid-color);
+            font-family: monospace;
+            opacity: 0.7;
+            height: var(--cell-size);
+            display: flex;
+            align-items: center;
+        }
+
+        /* Tooltip Styling */
+        .has-tooltip {
+            position: relative;
+        }
+        .has-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.2s;
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #1e293b;
+            color: #fff;
+            text-align: center;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 50;
+            pointer-events: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #f1f5f9; 
+            background: #f1f5f9;
         }
         ::-webkit-scrollbar-thumb {
-            background: #cbd5e1; 
-            border-radius: 5px;
+            background: #cbd5e1;
+            border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8; 
+            background: #94a3b8;
+        }
+
+        /* Print Media Styles */
+        @media print {
+            body {
+                background-color: white !important;
+                overflow: visible !important;
+            }
+            header, nav, .left-panel, .footer-stats, .no-print {
+                display: none !important;
+            }
+            main {
+                display: block !important;
+                height: auto !important;
+            }
+            .masume-container {
+                background-color: white !important;
+                padding: 0 !important;
+                overflow: visible !important;
+            }
+            .masume-sheet {
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: auto !important;
+            }
         }
     </style>
 </head>
 <body>
 
-    <header class="bg-white shadow-sm z-10 border-b border-gray-200">
-        <div class="max-w-screen-2xl mx-auto px-4 py-3 flex flex-col sm:flex-row justify-between items-center gap-4">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                書類フォーマットプレビューツール
-            </h1>
-            
-            <div class="flex items-center gap-6 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200 shadow-inner">
-                <div class="flex items-center gap-2">
-                    <label for="cols-input" class="text-sm font-semibold text-slate-600">1行の文字数:</label>
-                    <input type="number" id="cols-input" value="20" min="10" max="100" class="w-16 px-2 py-1 border border-slate-300 rounded text-center focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-colors">
+    <!-- App Header -->
+    <header class="bg-white border-b border-slate-200 z-30 shadow-sm flex-shrink-0">
+        <div class="max-w-screen-2xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-green-100 text-green-700 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
                 </div>
-                <div class="flex items-center gap-2">
-                    <label for="rows-input" class="text-sm font-semibold text-slate-600">行数:</label>
-                    <input type="number" id="rows-input" value="20" min="1" max="200" class="w-16 px-2 py-1 border border-slate-300 rounded text-center focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition-colors">
+                <div>
+                    <h1 class="text-lg font-bold text-slate-800 leading-tight">原稿用紙・公的書類マス目プレビュー</h1>
+                    <p class="text-xs text-slate-500">自動書式整形＆リアルタイム字数・マス数確認ツール</p>
                 </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- Preset Text Dropdown -->
+                <div class="relative inline-block text-left">
+                    <select id="sample-text-select" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium py-2 px-3 rounded-lg border border-slate-300 transition-colors cursor-pointer focus:outline-none">
+                        <option value="">📄 サンプル文章を選択...</option>
+                        <option value="novel">小説風（会話・描写）</option>
+                        <option value="essay">論文・レポート風</option>
+                        <option value="test">ルール検証用テスト</option>
+                    </select>
+                </div>
+
+                <button id="btn-copy-formatted" class="inline-flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded-lg border border-slate-300 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                    整形後の文章をコピー
+                </button>
+
+                <button id="btn-print" class="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold py-2 px-3 rounded-lg transition-colors shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                    </svg>
+                    印刷 / PDF出力
+                </button>
             </div>
         </div>
     </header>
 
-    <main class="flex-grow flex flex-col md:flex-row overflow-hidden">
-        
-        <!-- Left Pane: Input Area -->
-        <div class="flex-1 flex flex-col bg-white border-r border-slate-200 shadow-inner z-0 w-full md:w-1/2 h-1/2 md:h-full relative">
-            <div class="absolute top-0 left-0 w-full bg-slate-100/90 backdrop-blur-sm border-b border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider flex justify-between items-center">
-                <span>入力枠 (Input)</span>
+    <!-- Main Content Area -->
+    <main class="flex-grow flex flex-col lg:flex-row overflow-hidden">
+
+        <!-- Left Panel: Input & Rules Controls -->
+        <div class="left-panel w-full lg:w-5/12 bg-white border-r border-slate-200 flex flex-col h-1/2 lg:h-full z-10 shadow-lg">
+            
+            <!-- Controls Bar -->
+            <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col gap-3">
+                
+                <!-- Grid Dimensions & Theme -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                        <label for="cols-input" class="block text-xs font-bold text-slate-600 mb-1">1行の文字数(列)</label>
+                        <input type="number" id="cols-input" value="20" min="10" max="40" class="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-green-500 focus:outline-none font-bold text-center">
+                    </div>
+                    <div>
+                        <label for="rows-input" class="block text-xs font-bold text-slate-600 mb-1">行数</label>
+                        <input type="number" id="rows-input" value="20" min="5" max="50" class="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-green-500 focus:outline-none font-bold text-center">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">フォント</label>
+                        <select id="font-select" class="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-2 focus:ring-green-500 focus:outline-none bg-white font-medium">
+                            <option value="font-mincho">明朝体 (Noto Serif)</option>
+                            <option value="font-gothic">ゴシック体 (Noto Sans)</option>
+                            <option value="font-klee">手書き風 (Klee One)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">罫線カラー</label>
+                        <select id="theme-select" class="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:ring-2 focus:ring-green-500 focus:outline-none bg-white font-medium">
+                            <option value="theme-green">🟢 伝統緑</option>
+                            <option value="theme-vermilion">🟠 朱色</option>
+                            <option value="theme-gray">⚪ モノクロ</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Formatting Rule Switches -->
+                <div class="bg-white p-3 rounded-lg border border-slate-200 space-y-2">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                        <span class="text-xs font-bold text-slate-700 flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                            </svg>
+                            原稿用紙・公的書式ルール自動補正
+                        </span>
+                        <span class="text-[10px] text-slate-400">リアルタイム反映</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        
+                        <!-- Rule 1: Hanging Punctuation -->
+                        <label class="flex items-center justify-between p-1.5 rounded hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-colors has-tooltip">
+                            <span class="flex items-center gap-1.5 text-slate-700 font-medium">
+                                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                                行頭禁則 (ぶら下げ)
+                            </span>
+                            <input type="checkbox" id="rule-hanging" checked class="w-4 h-4 text-green-600 rounded focus:ring-green-500 cursor-pointer">
+                            <span class="tooltip-text">句読点や閉じ括弧が行頭に来ないよう、前行末にぶら下げます</span>
+                        </label>
+
+                        <!-- Rule 3: Merge 。and 」 -->
+                        <label class="flex items-center justify-between p-1.5 rounded hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-colors has-tooltip">
+                            <span class="flex items-center gap-1.5 text-slate-700 font-medium">
+                                <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                                『。』＋『」』1マス統合
+                            </span>
+                            <input type="checkbox" id="rule-merge" checked class="w-4 h-4 text-green-600 rounded focus:ring-green-500 cursor-pointer">
+                            <span class="tooltip-text">句点と閉じ括弧の連続（例: 。」）を1マスにまとめます</span>
+                        </label>
+
+                        <!-- Rule 4: Space after !? -->
+                        <label class="flex items-center justify-between p-1.5 rounded hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-colors has-tooltip">
+                            <span class="flex items-center gap-1.5 text-slate-700 font-medium">
+                                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                『！？』直後の1マス空け
+                            </span>
+                            <input type="checkbox" id="rule-excl-space" checked class="w-4 h-4 text-green-600 rounded focus:ring-green-500 cursor-pointer">
+                            <span class="tooltip-text">疑問符・感嘆符の直後に自動で1マス空けます</span>
+                        </label>
+
+                        <!-- Rule 5: Auto Indent -->
+                        <label class="flex items-center justify-between p-1.5 rounded hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-colors has-tooltip sm:col-span-2">
+                            <span class="flex items-center gap-1.5 text-slate-700 font-medium">
+                                <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                段落頭の自動字下げ (改行後1マス空け)
+                            </span>
+                            <input type="checkbox" id="rule-indent" checked class="w-4 h-4 text-green-600 rounded focus:ring-green-500 cursor-pointer">
+                            <span class="tooltip-text">改行後の文頭が空白でない場合、自動で全角1マス空けます</span>
+                        </label>
+
+                    </div>
+                </div>
+
             </div>
-            <textarea id="raw-input" class="flex-grow w-full h-full pt-12 p-6 resize-none focus:outline-none text-slate-800 text-base leading-relaxed bg-transparent" placeholder="ここにテキストを入力してください...&#10;（改行はそのまま反映されます）"></textarea>
+
+            <!-- Text Input Area -->
+            <div class="flex-grow relative flex flex-col">
+                <div class="px-4 py-2 bg-slate-100 border-b border-slate-200 flex justify-between items-center text-xs font-bold text-slate-600">
+                    <span>文章入力エリア</span>
+                    <button id="btn-clear" class="text-slate-400 hover:text-red-500 transition-colors">クリア</button>
+                </div>
+                <textarea id="raw-input" class="flex-grow p-4 w-full h-full resize-none focus:outline-none text-slate-800 text-sm leading-relaxed font-sans" placeholder="ここに本文を入力または貼り付けてください...&#10;&#10;書式ルール（行頭のぶら下げ、半角2文字1マス、段落の自動字下げ等）が右側の原稿用紙にリアルタイム反映されます。"></textarea>
+            </div>
         </div>
 
-        <!-- Right Pane: Preview Area -->
-        <div class="flex-1 flex flex-col relative w-full md:w-1/2 h-1/2 md:h-full bg-slate-200">
-            <div class="absolute top-0 left-0 w-full bg-slate-100/90 backdrop-blur-sm border-b border-slate-200 px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider z-10 flex justify-between items-center shadow-sm">
-                <span>プレビュー枠 (Preview)</span>
-                <span id="overflow-warning" class="text-red-600 hidden font-bold flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                    行数上限オーバー
-                </span>
-            </div>
+        <!-- Right Panel: Manuscript Grid Preview -->
+        <div class="right-panel w-full lg:w-7/12 bg-slate-300 flex flex-col h-1/2 lg:h-full relative overflow-hidden">
             
-            <div class="masume-container pt-16" id="masume-container">
-                <div class="masume-grid-wrapper">
-                    <div id="masume-preview" class="masume-grid">
-                        <!-- Grid cells will be generated here by JavaScript -->
+            <!-- Top Controls Overlay -->
+            <div class="p-2 px-4 bg-slate-800/90 text-white backdrop-blur-md border-b border-slate-700 flex justify-between items-center text-xs z-20 shadow-md">
+                <div class="flex items-center gap-4">
+                    <span class="font-bold flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-green-400"></span>
+                        原稿用紙リアルタイムプレビュー
+                    </span>
+                    <span id="overflow-alert" class="hidden text-red-400 font-bold bg-red-950 px-2 py-0.5 rounded border border-red-800 animate-pulse">
+                        ⚠️ 設定行数オーバー
+                    </span>
+                </div>
+
+                <!-- Legend & Zoom -->
+                <div class="flex items-center gap-3">
+                    <div class="hidden sm:flex items-center gap-2 text-[11px] text-slate-300">
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 bg-red-500 rounded-full"></span> ぶら下げ</span>
+                        <span class="flex items-center gap-1"><span class="w-2 h-2 bg-purple-500 rounded-full"></span> 統合</span>
+                    </div>
+
+                    <div class="flex items-center gap-1 bg-slate-700 rounded px-1 py-0.5">
+                        <button id="btn-zoom-out" class="px-1.5 py-0.5 hover:bg-slate-600 rounded text-slate-200 font-bold">-</button>
+                        <span id="zoom-level" class="text-[10px] w-8 text-center font-mono">100%</span>
+                        <button id="btn-zoom-in" class="px-1.5 py-0.5 hover:bg-slate-600 rounded text-slate-200 font-bold">+</button>
                     </div>
                 </div>
             </div>
+
+            <!-- Manuscript Paper Interactive Viewport -->
+            <div class="masume-container theme-green font-mincho" id="masume-container">
+                <div class="masume-sheet" id="masume-sheet">
+                    <div class="masume-outer-frame">
+                        
+                        <!-- Column Header Numbers -->
+                        <div class="col-number-bar" id="col-number-bar"></div>
+
+                        <div class="relative">
+                            <!-- Row Left Margin Numbers -->
+                            <div class="row-number-margin" id="row-number-margin"></div>
+
+                            <!-- Primary Manuscript Cell Grid -->
+                            <div id="masume-preview-grid" class="masume-grid"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
         </div>
-        
+
     </main>
 
-    <footer class="bg-slate-900 text-white shadow-lg z-20 flex-shrink-0">
-        <div class="max-w-screen-2xl mx-auto px-4 py-4">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center divide-x-0 md:divide-x divide-slate-700">
-                <div class="flex flex-col px-2">
-                    <span class="text-xs text-slate-400 mb-1">文字数（スペース込）</span>
-                    <span class="text-2xl font-bold font-mono" id="stat-chars-with-spaces">0</span>
+    <!-- Footer Statistics Bar (Google Docs + Genkoyoshi Metrics) -->
+    <footer class="footer-stats bg-slate-900 text-slate-100 border-t border-slate-800 z-30 flex-shrink-0">
+        <div class="max-w-screen-2xl mx-auto px-4 py-2.5">
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center divide-x-0 sm:divide-x divide-slate-800">
+                
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-slate-400">文字数 (空白込)</span>
+                    <span class="text-lg font-bold font-mono text-slate-200" id="stat-chars-with-spaces">0</span>
                 </div>
-                <div class="flex flex-col px-2">
-                    <span class="text-xs text-slate-400 mb-1">文字数（スペース抜）</span>
-                    <span class="text-2xl font-bold font-mono" id="stat-chars-no-spaces">0</span>
+
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-slate-400">文字数 (空白抜)</span>
+                    <span class="text-lg font-bold font-mono text-slate-200" id="stat-chars-no-spaces">0</span>
                 </div>
-                <div class="flex flex-col px-2">
-                    <span class="text-xs text-slate-400 mb-1">消費マス数（空白マス込）</span>
-                    <span class="text-2xl font-bold font-mono text-green-400" id="stat-squares">0</span>
+
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-slate-400">実質消費マス数</span>
+                    <span class="text-lg font-bold font-mono text-green-400" id="stat-squares">0</span>
                 </div>
-                <div class="flex flex-col px-2">
-                    <span class="text-xs text-slate-400 mb-1">使用行数 / 最大行数</span>
-                    <div class="text-2xl font-bold font-mono">
-                        <span id="stat-lines-used" class="transition-colors">0</span>
-                        <span class="text-slate-500 text-lg mx-1">/</span>
-                        <span id="stat-lines-max" class="text-slate-500 text-lg">20</span>
+
+                <div class="flex flex-col">
+                    <span class="text-[10px] text-slate-400">使用行数 / 最大行数</span>
+                    <div class="text-lg font-bold font-mono">
+                        <span id="stat-lines-used">0</span>
+                        <span class="text-slate-600 text-sm">/</span>
+                        <span id="stat-lines-max" class="text-slate-500 text-sm">20</span>
                     </div>
                 </div>
+
+                <div class="flex flex-col col-span-2 sm:col-span-1">
+                    <span class="text-[10px] text-slate-400">換算枚数 (400字詰)</span>
+                    <span class="text-lg font-bold font-mono text-amber-400" id="stat-sheets">0.0 枚</span>
+                </div>
+
             </div>
         </div>
     </footer>
 
+    <!-- JavaScript Application Engine -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // DOM Elements
+            
+            // DOM References
             const colsInput = document.getElementById('cols-input');
             const rowsInput = document.getElementById('rows-input');
+            const themeSelect = document.getElementById('theme-select');
+            const fontSelect = document.getElementById('font-select');
             const rawInput = document.getElementById('raw-input');
-            const masumePreview = document.getElementById('masume-preview');
             
+            // Rule Toggles
+            const ruleHanging = document.getElementById('rule-hanging');
+            const ruleMerge = document.getElementById('rule-merge');
+            const ruleExclSpace = document.getElementById('rule-excl-space');
+            const ruleIndent = document.getElementById('rule-indent');
+
+            // Preview & Grid
+            const masumeContainer = document.getElementById('masume-container');
+            const masumeSheet = document.getElementById('masume-sheet');
+            const masumeGrid = document.getElementById('masume-preview-grid');
+            const colNumberBar = document.getElementById('col-number-bar');
+            const rowNumberMargin = document.getElementById('row-number-margin');
+            const overflowAlert = document.getElementById('overflow-alert');
+
+            // Stats
             const statCharsWithSpaces = document.getElementById('stat-chars-with-spaces');
             const statCharsNoSpaces = document.getElementById('stat-chars-no-spaces');
             const statSquares = document.getElementById('stat-squares');
             const statLinesUsed = document.getElementById('stat-lines-used');
             const statLinesMax = document.getElementById('stat-lines-max');
-            const overflowWarning = document.getElementById('overflow-warning');
+            const statSheets = document.getElementById('stat-sheets');
 
-            // Global State
-            let currentCols = parseInt(colsInput.value, 10);
-            let currentRows = parseInt(rowsInput.value, 10);
-            let cells = [];
+            // Buttons
+            const sampleSelect = document.getElementById('sample-text-select');
+            const btnCopy = document.getElementById('btn-copy-formatted');
+            const btnPrint = document.getElementById('btn-print');
+            const btnClear = document.getElementById('btn-clear');
+            const btnZoomIn = document.getElementById('btn-zoom-in');
+            const btnZoomOut = document.getElementById('btn-zoom-out');
+            const zoomLevelDisplay = document.getElementById('zoom-level');
+
+            // Zoom State
+            let currentScale = 1.0;
+
+            // Sample Text Presets
+            const SAMPLES = {
+                novel: `　秋の午後の日差しが、図書館の古い木の床に長い影を落としていた。私は読みかけの文庫本から顔を上げ、静かな空間を見渡した。
+「あれ、こんなところにいたの？」
+　突然、背後から声をかけられて私は肩をびくっと震わせた。振り返ると、高校時代からの友人である佐藤が、少し悪戯っぽい笑みを浮かべて立っていた。
+「驚かせないでよ！」
+「ごめんごめん。でも、相変わらず本ばかり読んでいるんだな」
+　佐藤の言う通りだった。私は昔から、現実の世界よりも物語の中を泳ぐ方が好きだったのだ。それでも、こうして時々現実の友人から引き戻される瞬間も、案外悪くないと思っている。
+「それで、今日は何か用なの？」と私は尋ねた。
+「いや、ちょっと近くまで来たからさ。お茶でもどうかなと思って」
+　時計を見ると、ちょうど午後三時を回ったところだった。たまには読書を中断するのもいいかもしれない。`,
+                
+                essay: `　現代社会において、情報技術の急速な発展は人々の生活様式を根底から変革しつつある。特に2020年代以降における人工知能、すなわちAIの進化は目覚ましく、これまで人間が行ってきた知的作業の多くが代替される可能性が示唆されている。
+　第一の利点として挙げられるのは、業務効率の劇的な向上である。膨大なデータの処理や複雑な計算など、AIは人間を遥かに凌駕するスピードと正確性でタスクを遂行する。これにより、私たちはより創造的で付加価値の高い業務に専念することが可能となる。
+　しかしながら、AIの普及に伴う課題も無視することはできない。例えば、個人のプライバシー保護や情報漏洩のリスク、さらにはAIが下した判断の倫理的妥当性など、解決すべき問題は山積している。技術の進歩を手放しで礼賛するのではなく、その負の側面にも目を向け、適切な法整備やガイドラインの策定を進めていくことが、今後の成熟した情報化社会には不可欠であると言える。`,
+
+                test: `　この文章は、原稿用紙の書式ルールを検証するためのテスト用テキストです。プログラムが正しく機能しているかを確認するために、意図的に様々な要素を盛り込んでいます。
+　まず、英数字のテストです。AIやVR、2026年といった文字が、1マスに1文字ずつ正確に配置されるかを確認します。次に、行頭禁則処理（ぶら下げ）の確認を行います。わざと行の最後のマス目に文字が入り、その次の文字として句点や読点が続くように文字数を調整してみます。あああああああ。
+「これでぶら下げが発動するはずだ。」
+　また、疑問符や感嘆符の動作も重要です。これは本当に成功するのでしょうか？はい、きっと成功するはずです！このように、記号の直後には自動的に1マス分の空白が挿入される仕組みになっています。
+「閉じ括弧と句点の統合も確認しましょう。」
+　すべてのルールが適用されれば、美しいレイアウトが完成します。`
+            };
 
             /**
-             * グリッドをDOMに生成する
+             * Primary Manuscript Text Parser
+             * Reads raw input string and options, returns tokenized grid mapping and statistics
              */
-            function initGrid() {
-                currentCols = parseInt(colsInput.value, 10) || 20;
-                currentRows = parseInt(rowsInput.value, 10) || 20;
-                
-                // CSS変数に列数を適用（これにより自動で升目が並ぶ）
-                document.documentElement.style.setProperty('--cols', currentCols);
-                statLinesMax.textContent = currentRows;
-                
-                // 既存のグリッドをクリア
-                masumePreview.innerHTML = '';
-                cells = [];
-                
-                // 升目を指定数（列 × 行）作成
-                const totalCells = currentCols * currentRows;
-                for (let i = 0; i < totalCells; i++) {
-                    const cell = document.createElement('div');
-                    cell.className = 'masume-cell';
-                    masumePreview.appendChild(cell);
-                    cells.push(cell); // 高速アクセスのため配列に保持
-                }
-                
-                updatePreviewAndStats();
-            }
+            function parseAndFormatManuscript(rawText, options) {
+                let text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-            /**
-             * 入力テキストをグリッドに割り当てて統計を計算する
-             */
-            function updatePreviewAndStats() {
-                const text = rawInput.value;
-                // 改行コードを \n に統一
-                const normalizedText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                
-                // すべての升目の文字をクリア
-                for(let i = 0; i < cells.length; i++) {
-                    cells[i].textContent = '';
+                // Rule 5: Auto Indent at start of paragraphs
+                if (options.autoIndent && text.length > 0) {
+                    let lines = text.split('\n');
+                    lines = lines.map(line => {
+                        if (line.length > 0 && !line.startsWith(' ') && !line.startsWith('　') && !line.startsWith('\t')) {
+                            return '　' + line;
+                        }
+                        return line;
+                    });
+                    text = lines.join('\n');
                 }
-                
-                let r = 0; // 現在の行 (0から開始)
-                let c = 0; // 現在の列 (0から開始)
-                let withSpaces = 0;
-                let noSpaces = 0;
-                let isOverflowing = false;
 
-                // 1文字ずつ判定してマスに配置していく
-                for (let i = 0; i < normalizedText.length; i++) {
-                    const char = normalizedText[i];
-                    
-                    // 【修正点】改行の処理
-                    // 改行文字が来た場合は、現在の文字数がいくつであっても強制的に次の行へ移動
+                // Rule 4: Auto Space after Exclamation / Question Marks
+                if (options.exclSpace) {
+                    text = text.replace(/([！？!?])(?![」』）\n\s　])/g, '$1　');
+                }
+
+                // Punctuation sets for line-start prohibition (行頭禁則)
+                const isLineStartProhibited = (ch) => /[。、」』）】＞!?！？]/.test(ch);
+
+                // Step 1: Tokenize
+                let tokens = [];
+                let i = 0;
+
+                while (i < text.length) {
+                    const char = text[i];
+
                     if (char === '\n') {
-                        r++;
-                        c = 0;
-                        continue; // 次の文字の処理へ
-                    }
-                    
-                    // 【修正点】自動折り返しの処理
-                    // もし現在の列(c)が最大列数(currentCols)に達していたら、次の行へ移動してから文字を置く
-                    if (c >= currentCols) {
-                        r++;
-                        c = 0;
+                        tokens.push({ type: 'newline', text: '\n' });
+                        i++;
+                        continue;
                     }
 
-                    // 文字数のカウント
-                    withSpaces++;
-                    // 全角・半角スペース、タブを除外した文字数
-                    if (char !== ' ' && char !== '　' && char !== '\t') {
-                        noSpaces++;
+                    // Rule 3: Merge 。」 or 、」
+                    if (options.mergePunct && i + 1 < text.length) {
+                        const nextChar = text[i + 1];
+                        if ((char === '。' || char === '、') && (nextChar === '」' || nextChar === '』')) {
+                            tokens.push({ type: 'merged', text: char + nextChar });
+                            i += 2;
+                            continue;
+                        }
                     }
-                    
-                    // 升目へのテキスト挿入
-                    const index = r * currentCols + c;
-                    if (index < cells.length) {
-                        cells[index].textContent = char;
+
+                    // Space check
+                    if (char === '　' || char === ' ') {
+                        tokens.push({ type: 'indent', text: ' ' });
+                        i++;
+                        continue;
+                    }
+
+                    // Default single character
+                    tokens.push({ type: 'normal', text: char });
+                    i++;
+                }
+
+                // Step 2: Map Tokens to Grid Cells
+                const cols = options.cols;
+                let cells = []; // Array of cell objects: { r, c, text, type, hangingPunct }
+                let r = 0;
+                let c = 0;
+
+                let statWithSpaces = 0;
+                let statNoSpaces = 0;
+
+                for (let t = 0; t < tokens.length; t++) {
+                    const token = tokens[t];
+
+                    if (token.type === 'newline') {
+                        r++;
+                        c = 0;
+                        continue;
+                    }
+
+                    // Statistics Count
+                    if (token.type === 'merged') {
+                        statWithSpaces += 2;
+                        statNoSpaces += 2;
+                    } else if (token.type === 'indent') {
+                        statWithSpaces += 1;
                     } else {
-                        isOverflowing = true;
+                        statWithSpaces += token.text.length;
+                        statNoSpaces += token.text.length;
                     }
-                    
-                    // 列を1つ進める
+
+                    // Check for Rule 1: Hanging Punctuation (ぶら下げ)
+                    // If we are about to place a line-prohibited punctuation at column 0 of a new line (c == 0, r > 0)
+                    if (options.hanging && c === 0 && r > 0 && isLineStartProhibited(token.text[0])) {
+                        // Find the last cell of previous row (r-1, cols-1)
+                        const prevIndex = cells.findIndex(cell => cell.r === r - 1 && cell.c === cols - 1);
+                        if (prevIndex !== -1) {
+                            cells[prevIndex].hangingPunct = (cells[prevIndex].hangingPunct || '') + token.text;
+                            // Do not advance r or c, punctuation is hung on previous line
+                            continue;
+                        }
+                    }
+
+                    // Wrap line if c reaches max columns
+                    if (c >= cols) {
+                        r++;
+                        c = 0;
+
+                        // Re-check hanging condition right after wrapping
+                        if (options.hanging && r > 0 && isLineStartProhibited(token.text[0])) {
+                            const prevIndex = cells.findIndex(cell => cell.r === r - 1 && cell.c === cols - 1);
+                            if (prevIndex !== -1) {
+                                cells[prevIndex].hangingPunct = (cells[prevIndex].hangingPunct || '') + token.text;
+                                continue;
+                            }
+                        }
+                    }
+
+                    // Place normal cell
+                    cells.push({
+                        r: r,
+                        c: c,
+                        text: token.text,
+                        type: token.type,
+                        hangingPunct: null
+                    });
+
                     c++;
                 }
 
-                // --- 統計の計算 ---
-                // 消費したマス数（現在の行 * 1行のマス数 + 現在の列）
-                // 改行によって生じた「行末の空白マス」も全て消費マスとしてカウントされる
-                let squares = (r * currentCols) + c;
-                // 現在使用している行数
-                let lines = (squares > 0 || r > 0) ? (r + 1) : 0; 
-                
-                if (normalizedText.length === 0) {
-                    squares = 0;
-                    lines = 0;
+                const totalSquares = (r * cols) + c;
+                const linesUsed = (totalSquares > 0 || r > 0) ? (r + 1) : 0;
+
+                return {
+                    cells,
+                    statWithSpaces,
+                    statNoSpaces,
+                    statSquares: totalSquares,
+                    statLinesUsed: linesUsed,
+                    formattedText: text
+                };
+            }
+
+            /**
+             * Renders Grid Elements and Updates Stats
+             */
+            function renderGrid() {
+                const cols = parseInt(colsInput.value, 10) || 20;
+                const rows = parseInt(rowsInput.value, 10) || 20;
+
+                // Update CSS variables
+                document.documentElement.style.setProperty('--cols', cols);
+                document.documentElement.style.setProperty('--rows', rows);
+
+                // Collect Options
+                const options = {
+                    cols,
+                    rows,
+                    hanging: ruleHanging.checked,
+                    mergePunct: ruleMerge.checked,
+                    exclSpace: ruleExclSpace.checked,
+                    autoIndent: ruleIndent.checked
+                };
+
+                const result = parseAndFormatManuscript(rawInput.value, options);
+
+                // Build Column Header Numbers (1 .. cols)
+                colNumberBar.innerHTML = '';
+                for (let i = 1; i <= cols; i++) {
+                    const numDiv = document.createElement('div');
+                    numDiv.className = 'col-num';
+                    numDiv.textContent = i;
+                    colNumberBar.appendChild(numDiv);
                 }
 
-                // UIの数値を更新
-                statCharsWithSpaces.textContent = withSpaces.toLocaleString();
-                statCharsNoSpaces.textContent = noSpaces.toLocaleString();
-                statSquares.textContent = squares.toLocaleString();
-                statLinesUsed.textContent = lines.toLocaleString();
+                // Build Row Left Margin Numbers (1 .. rows)
+                rowNumberMargin.innerHTML = '';
+                const maxRowDisplay = Math.max(rows, result.statLinesUsed);
+                for (let i = 1; i <= maxRowDisplay; i++) {
+                    const numDiv = document.createElement('div');
+                    numDiv.className = 'row-num';
+                    numDiv.textContent = i;
+                    rowNumberMargin.appendChild(numDiv);
+                }
 
-                // 上限オーバー時の警告表示と色変更
-                if (lines > currentRows || isOverflowing) {
+                // Clear Grid
+                masumeGrid.innerHTML = '';
+
+                // Generate total cells (cols * max(rows, linesUsed))
+                const totalCellsToRender = cols * Math.max(rows, result.statLinesUsed);
+
+                // Map cells by index key for O(1) lookup
+                const cellMap = {};
+                result.cells.forEach(cell => {
+                    const key = `${cell.r}_${cell.c}`;
+                    cellMap[key] = cell;
+                });
+
+                for (let i = 0; i < totalCellsToRender; i++) {
+                    const r = Math.floor(i / cols);
+                    const c = i % cols;
+                    const key = `${r}_${c}`;
+                    const cellData = cellMap[key];
+
+                    const cellElem = document.createElement('div');
+                    cellElem.className = 'masume-cell';
+
+                    if (cellData) {
+                        cellElem.textContent = cellData.text;
+
+                        if (cellData.type === 'merged') {
+                            cellElem.classList.add('cell-merged');
+                        } else if (cellData.type === 'indent') {
+                            cellElem.classList.add('cell-indent');
+                        }
+
+                        // Render Hanging Punctuation Badge
+                        if (cellData.hangingPunct) {
+                            const badge = document.createElement('span');
+                            badge.className = 'hanging-badge';
+                            badge.textContent = cellData.hangingPunct;
+                            badge.title = '行頭禁則によるぶら下げ';
+                            cellElem.appendChild(badge);
+                        }
+                    }
+
+                    masumeGrid.appendChild(cellElem);
+                }
+
+                // Update Metrics UI
+                statCharsWithSpaces.textContent = result.statWithSpaces.toLocaleString();
+                statCharsNoSpaces.textContent = result.statNoSpaces.toLocaleString();
+                statSquares.textContent = result.statSquares.toLocaleString();
+                statLinesUsed.textContent = result.statLinesUsed.toLocaleString();
+                statLinesMax.textContent = rows;
+
+                // Estimated 400-char Genkoyoshi Sheets
+                const sheets = (result.statSquares / 400).toFixed(1);
+                statSheets.textContent = `${sheets} 枚`;
+
+                // Overflow Warning Alert
+                if (result.statLinesUsed > rows) {
                     statLinesUsed.classList.add('text-red-400');
-                    statLinesUsed.classList.remove('text-white');
-                    overflowWarning.classList.remove('hidden');
+                    overflowAlert.classList.remove('hidden');
                 } else {
                     statLinesUsed.classList.remove('text-red-400');
-                    statLinesUsed.classList.add('text-white');
-                    overflowWarning.classList.add('hidden');
+                    overflowAlert.classList.add('hidden');
                 }
             }
 
-            // イベントリスナーの登録
-            rawInput.addEventListener('input', updatePreviewAndStats);
-            colsInput.addEventListener('input', initGrid);
-            rowsInput.addEventListener('input', initGrid);
+            // Theme Switcher
+            themeSelect.addEventListener('change', (e) => {
+                masumeContainer.classList.remove('theme-green', 'theme-vermilion', 'theme-gray');
+                masumeContainer.classList.add(e.target.value);
+            });
 
-            // 初期化実行
-            initGrid();
+            // Font Switcher
+            fontSelect.addEventListener('change', (e) => {
+                masumeContainer.classList.remove('font-mincho', 'font-gothic', 'font-klee');
+                masumeContainer.classList.add(e.target.value);
+            });
+
+            // Preset Sample Text Loader
+            sampleSelect.addEventListener('change', (e) => {
+                const key = e.target.value;
+                if (key && SAMPLES[key]) {
+                    rawInput.value = SAMPLES[key];
+                    renderGrid();
+                }
+            });
+
+            // Copy Formatted Text
+            btnCopy.addEventListener('click', () => {
+                const options = {
+                    cols: parseInt(colsInput.value, 10) || 20,
+                    rows: parseInt(rowsInput.value, 10) || 20,
+                    hanging: ruleHanging.checked,
+                    mergePunct: ruleMerge.checked,
+                    exclSpace: ruleExclSpace.checked,
+                    autoIndent: ruleIndent.checked
+                };
+                const result = parseAndFormatManuscript(rawInput.value, options);
+                
+                // Copy via execCommand for iframe compatibility
+                const tempTextArea = document.createElement('textarea');
+                tempTextArea.value = result.formattedText;
+                document.body.appendChild(tempTextArea);
+                tempTextArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempTextArea);
+
+                // Temporary button feedback
+                const origText = btnCopy.innerHTML;
+                btnCopy.innerHTML = `✓ コピー完了!`;
+                btnCopy.classList.add('bg-green-100', 'text-green-700');
+                setTimeout(() => {
+                    btnCopy.innerHTML = origText;
+                    btnCopy.classList.remove('bg-green-100', 'text-green-700');
+                }, 2000);
+            });
+
+            // Print Trigger
+            btnPrint.addEventListener('click', () => {
+                window.print();
+            });
+
+            // Clear Input
+            btnClear.addEventListener('click', () => {
+                rawInput.value = '';
+                sampleSelect.value = '';
+                renderGrid();
+            });
+
+            // Zoom Controls
+            btnZoomIn.addEventListener('click', () => {
+                if (currentScale < 1.5) {
+                    currentScale += 0.1;
+                    masumeSheet.style.transform = `scale(${currentScale})`;
+                    zoomLevelDisplay.textContent = `${Math.round(currentScale * 100)}%`;
+                }
+            });
+
+            btnZoomOut.addEventListener('click', () => {
+                if (currentScale > 0.6) {
+                    currentScale -= 0.1;
+                    masumeSheet.style.transform = `scale(${currentScale})`;
+                    zoomLevelDisplay.textContent = `${Math.round(currentScale * 100)}%`;
+                }
+            });
+
+            // Input Event Listeners
+            rawInput.addEventListener('input', renderGrid);
+            colsInput.addEventListener('input', renderGrid);
+            rowsInput.addEventListener('input', renderGrid);
+
+            [ruleHanging, ruleMerge, ruleExclSpace, ruleIndent].forEach(chk => {
+                chk.addEventListener('change', renderGrid);
+            });
+
+            // Initialize App
+            renderGrid();
         });
     </script>
 </body>
